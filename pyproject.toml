@@ -1,10 +1,10 @@
 [project]
-name = "quickstart-demo"
+name = "file-io-demo"
 version = "0.1.0"
-description = "Kernel application template - Python"
+description = "Receipt download automation script using Kernel browsers - Python"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["kernel>=0.8.1", "playwright>=1.52.0"]
+dependencies = ["kernel>=0.8.1", "playwright>=1.52.0", "browser-use>=0.5.3", "python-dotenv>=1.0.0"]
 
 [dependency-groups]
 dev = ["mypy>=1.15.0"]

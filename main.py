@@ -1,95 +1,106 @@
-import kernel
-from kernel import Kernel
+import asyncio
+import os
+from dotenv import load_dotenv
+
+from kernel import AsyncKernel
 from playwright.async_api import async_playwright
-from typing import TypedDict
-from urllib.parse import urlparse
 
-client = Kernel()
+# Load environment variables
+load_dotenv()
 
-# Create a new Kernel app
-app = kernel.App("quickstart-demo")
+# Configuration
+WEBSITE_URL = "https://tinyurl.com/kernel-file-io-demo-site"
+EMAIL = "danny@onkernel.com"
+ORDER_NUMBER = "110011001"
+DOWNLOAD_DIR = "/tmp/downloads"
 
-"""
-Example app that extracts the title of a webpage
-Args:
-    ctx: Kernel context containing invocation information
-    payload: An object with a URL property
-Returns:
-    A dictionary containing the page title
-Invoke this via CLI:
-    kernel login  # or: export KERNEL_API_KEY=<your_api_key>
-    kernel deploy main.py # If you haven't already deployed this app
-    kernel invoke quickstart-demo get-page-title -p '{"url": "https://www.google.com"}'
-    kernel logs quickstart-demo -f # Open in separate tab
-"""
-class PageTitleInput(TypedDict):
-    url: str
+client = AsyncKernel()
 
-class PageTitleOutput(TypedDict):
-    title: str
 
-@app.action("get-page-title")
-async def get_page_title(ctx: kernel.KernelContext, input_data: PageTitleInput) -> PageTitleOutput:
-    url = input_data.get("url")
-    if not url or not isinstance(url, str):
-        raise ValueError("URL is required and must be a string")
+async def main():
+    # Create a new browser via Kernel
+    kernelBrowser = await client.browsers.create(timeout_seconds=120)
+    print("Kernel browser live view url:", kernelBrowser.browser_live_view_url)
 
-    # Add https:// if no protocol is present
-    if not url.startswith(('http://', 'https://')):
-        url = f"https://{url}"
-
-    # Validate the URL
-    try:
-        urlparse(url)
-    except Exception:
-        raise ValueError(f"Invalid URL: {url}")
-
-    # Create a browser instance using the context's invocation_id
-    kernel_browser = client.browsers.create(invocation_id=ctx.invocation_id)
-    print("Kernel browser live view url: ", kernel_browser.browser_live_view_url)
-    
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.connect_over_cdp(kernel_browser.cdp_ws_url)
-        context = await browser.new_context()
-        page = await context.new_page()
-        
+        browser = await playwright.chromium.connect_over_cdp(kernelBrowser.cdp_ws_url)
+        context = browser.contexts[0]
+        page = context.pages[0] if len(context.pages) > 0 else await context.new_page()
+
+        # Required to prevent Playwright from overriding the location of the downloaded file
+        cdp_session = await context.new_cdp_session(page)
+        await cdp_session.send(
+            "Browser.setDownloadBehavior",
+            {
+                "behavior": "allow",
+                "downloadPath": DOWNLOAD_DIR,
+                "eventsEnabled": True,
+            },
+        )
+
+        # Set up CDP listeners to capture download filename and completion
+        download_completed = asyncio.Event()
+        download_filename: str | None = None
+
+        def _on_download_begin(event):
+            nonlocal download_filename
+            download_filename = event.get("suggestedFilename", "unknown")
+            print(f"Download started: {download_filename}")
+
+        def _on_download_progress(event):
+            if event.get("state") in ["completed", "canceled"]:
+                download_completed.set()
+
+        cdp_session.on("Browser.downloadWillBegin", _on_download_begin)
+        cdp_session.on("Browser.downloadProgress", _on_download_progress)
+
+        # Navigate to the booking lookup page
+        print(f"Navigating to booking lookup page: {WEBSITE_URL}")
+        await page.goto(WEBSITE_URL)
+
+        # Fill in the email field
+        print(f"Filling email field with: {EMAIL}")
+        await page.fill('input#email', EMAIL)
+
+        # Fill in the booking reference field
+        print(f"Filling booking reference field with: {ORDER_NUMBER}")
+        await page.fill('input#order_number', ORDER_NUMBER)
+
+        # Click the "Look Up Booking" button
+        print("Clicking 'Look Up Booking' button")
+        await page.click('button#generateBtn')
+
+        # Wait for navigation to order confirmation page
+        print("Waiting for order confirmation page to load")
+        await page.wait_for_load_state('networkidle')
+
+        # Click the download receipt button
+        print("Clicking download receipt button")
+        await page.click('a.btn-download')
+
+        # Wait for download to complete
         try:
-            ####################################
-            # Your browser automation logic here
-            ####################################
-            await page.goto(url)
-            title = await page.title()
-            
-            return {"title": title}
-        finally:
-            await browser.close()
+            await asyncio.wait_for(download_completed.wait(), timeout=30)
+            print("Download completed")
+        except asyncio.TimeoutError:
+            print("Download timed out after 30 seconds")
+            return
+
+        # Download the file directly from the browser instance
+        if download_filename:
+            print(f"Reading downloaded file: {download_filename}")
+            resp = await client.browsers.fs.read_file(
+                kernelBrowser.session_id, path=f"{DOWNLOAD_DIR}/{download_filename}"
+            )
+            local_path = f"./downloads/{download_filename}"
+            os.makedirs("./downloads", exist_ok=True)
+            await resp.write_to_file(local_path)  # streaming; file never in memory
+            print(f"✅ Receipt saved to {local_path}")
+        else:
+            print("❌ No download filename captured")
+
+        client.browsers.delete_by_id(kernelBrowser.session_id)
 
 
-"""
-Example app that instantiates a persisted Kernel browser that can be reused across invocations
-Invoke this action to test Kernel browsers manually with our browser live view
-https://docs.onkernel.com/launch/browser-persistence
-Args:
-    ctx: Kernel context containing invocation information
-Returns:
-    A dictionary containing the browser live view url
-Invoke this via CLI:
-    kernel login  # or: export KERNEL_API_KEY=<your_api_key>
-    kernel deploy main.py # If you haven't already deployed this app
-    kernel invoke quickstart-demo create-persisted-browser
-    kernel logs quickstart-demo -f # Open in separate tab
-"""
-class CreatePersistedBrowserOutput(TypedDict):
-    browser_live_view_url: str
-
-@app.action("create-persisted-browser")
-async def create_persisted_browser(ctx: kernel.KernelContext) -> CreatePersistedBrowserOutput:
-    kernel_browser = client.browsers.create(
-        invocation_id=ctx.invocation_id,
-        persistence={"id": "persisted-browser"},
-        stealth=True, # Turns on residential proxy & auto-CAPTCHA solver
-    )
-
-    return {
-      "browser_live_view_url": kernel_browser.browser_live_view_url,
-    }
+if __name__ == "__main__":
+    asyncio.run(main())
