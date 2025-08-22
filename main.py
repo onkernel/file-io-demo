@@ -84,23 +84,18 @@ async def main():
             print("Download completed")
         except asyncio.TimeoutError:
             print("Download timed out after 30 seconds")
-            return
-
-        # Download the file directly from the browser instance
-        if download_filename:
-            print(f"Reading downloaded file: {download_filename}")
-            resp = await client.browsers.fs.read_file(
-                kernelBrowser.session_id, path=f"{DOWNLOAD_DIR}/{download_filename}"
-            )
-            local_path = f"./downloads/{download_filename}"
-            os.makedirs("./downloads", exist_ok=True)
-            await resp.write_to_file(local_path)  # streaming; file never in memory
-            print(f"✅ Receipt saved to {local_path}")
-        else:
-            print("❌ No download filename captured")
-
-        client.browsers.delete_by_id(kernelBrowser.session_id)
-
+        finally:
+            if download_filename:
+                print(f"Reading downloaded file: {download_filename}")
+                resp = await client.browsers.fs.read_file(kernelBrowser.session_id, path=f"{DOWNLOAD_DIR}/{download_filename}")
+                local_path = f"./downloads/{download_filename}"
+                os.makedirs("./downloads", exist_ok=True)
+                await resp.write_to_file(local_path)  # streaming; file never in memory
+                print(f"✅ Receipt saved to {local_path}")
+            else:
+                print("❌ No download filename captured")
+            
+            await client.browsers.delete_by_id(kernelBrowser.session_id)
 
 if __name__ == "__main__":
     asyncio.run(main())

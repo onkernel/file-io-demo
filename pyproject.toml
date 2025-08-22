@@ -8,3 +8,6 @@ dependencies = ["kernel>=0.8.1", "playwright>=1.52.0", "browser-use>=0.5.3", "py
 
 [dependency-groups]
 dev = ["mypy>=1.15.0"]
+
+[tool.pyright]
+reportUnreachable = false
