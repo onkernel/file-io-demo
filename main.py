@@ -10,7 +10,7 @@ load_dotenv()
 
 # Configuration
 WEBSITE_URL = "https://tinyurl.com/kernel-file-io-demo-site"
-EMAIL = "danny@onkernel.com"
+EMAIL = "support@onkernel.com"
 ORDER_NUMBER = "110011001"
 DOWNLOAD_DIR = "/tmp/downloads"
 
@@ -54,20 +54,20 @@ async def main():
         cdp_session.on("Browser.downloadWillBegin", _on_download_begin)
         cdp_session.on("Browser.downloadProgress", _on_download_progress)
 
-        # Navigate to the booking lookup page
-        print(f"Navigating to booking lookup page: {WEBSITE_URL}")
+        # Navigate to the Parking lookup page
+        print(f"Navigating to Parking lookup page: {WEBSITE_URL}")
         await page.goto(WEBSITE_URL)
 
         # Fill in the email field
         print(f"Filling email field with: {EMAIL}")
         await page.fill('input#email', EMAIL)
 
-        # Fill in the booking reference field
-        print(f"Filling booking reference field with: {ORDER_NUMBER}")
+        # Fill in the Parking reference field
+        print(f"Filling Parking reference field with: {ORDER_NUMBER}")
         await page.fill('input#order_number', ORDER_NUMBER)
 
-        # Click the "Look Up Booking" button
-        print("Clicking 'Look Up Booking' button")
+        # Click the "Look Up Parking" button
+        print("Clicking 'Look Up Parking' button")
         await page.click('button#generateBtn')
 
         # Wait for navigation to order confirmation page
