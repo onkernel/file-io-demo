@@ -74,7 +74,7 @@ The script will:
 - Print the Kernel browser live view URL (watch the automation in real-time)
 - Navigate through the demo site
 - Download the receipt
-- Save it to `./downloads/receipt_110011001.pdf`
+- Save it to `./downloads/`
 
 ### Customizing for Your Use Case
 
