@@ -3,6 +3,7 @@
 A demonstration of file download automation using [Kernel](https://onkernel.com) cloud browsers with Playwright and Chrome DevTools Protocol (CDP).
 
 This example shows how to automate downloading files from websites using Kernel's remote browser infrastructure, then retrieve those files from the cloud browser's filesystem to your local machine.
+[![Kernel File I/O Youtube Video Screenshot](https://github.com/user-attachments/assets/44e168e6-5392-4002-85fc-59618684b92b)](https://www.youtube.com/watch?v=zJWSa-Eqbfs)
 
 ## What This Demo Does
 
